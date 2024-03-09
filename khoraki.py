@@ -11,106 +11,42 @@ def initializePopulation(dfSize):
 def generateRandomWeight(minWeight, maxWeight):
     return random.uniform(minWeight, maxWeight)
 
-def addWeights(gene):
-    weightSum = 0
-    for i in range(0, len(gene)):
-        weightSum = weightSum + gene[i]
-    
-    return weightSum
-
-def generateSnackWeights(pickedIndices, maxWeight, df):
+def generateSnackWeights(pickedIndices, df):
     gene = initializePopulation(df.shape[0])
-    weightSum = 0
-
     for i in range(0, len(pickedIndices)):
-        if i == len(pickedIndices) -1:
-            if df['Available Weight'][pickedIndices[i]] <= (maxWeight - weightSum):
-                gene[pickedIndices[i]] = df['Available Weight'][pickedIndices[i]]
-            
-            else:
-                gene[pickedIndices[i]] = maxWeight - weightSum
-           # print("for last ", gene[pickedIndices[i]], " was selected", df['Available Weight'][pickedIndices[i]]," was available")
+        w = generateRandomWeight(0, df['Available Weight'][pickedIndices[i]])
+        gene[pickedIndices[i]] = w
 
-        else:
-            w = generateRandomWeight(0, df['Available Weight'][pickedIndices[i]])
-            gene[pickedIndices[i]] = w
-
-            while(weightSum + w > maxWeight):
-                w = generateRandomWeight(0, df['Available Weight'][pickedIndices[i]])
-
-                if w + weightSum <= maxWeight:
-                    gene[pickedIndices[i]] = w
-                    break
-                        
-            weightSum += w
-
-    #print(gene)
     return gene
 
-def isWeightValid(snackIndex, pickedWeight, df):
-    if (df['Available Weight'][snackIndex + 1] < pickedWeight * df['value_per_weight'][snackIndex + 1]):
-        return False
-
-    return True
-
-def fitnessCalculator(gene, df, minVal):
+def fitnessCalculator(gene, df, minVal, maxWeight, minNumber, maxNumber) -> tuple[int, int]:
     df['value_per_weight'] = df['Value'] / df['Available Weight']
-    fitnesss = 0
+    value = 0
+    types = 0
+    weightSUm = 0
+    fitness = 0
     for i in range(0, len(gene)):
         if gene[i] != 0:
-            fitnesss += df['value_per_weight'][i] * gene[i]
+            weightSUm += gene[i]
+            types += 1
+            value += df['value_per_weight'][i] * gene[i]
 
-    if fitnesss < minVal:
-        return 0
-    return fitnesss
+    if value < minVal:
+        fitness =  0
+    elif weightSUm > maxWeight:
+        fitness =  0
+    elif types < minNumber or types > maxNumber:
+        fitness =  0
+    else:
+        fitness = value
 
-def generateSubset(genes):
-    subsetSize = random.randint(2, len(genes))
-    pickedIndices = []
-    while len(pickedIndices) < subsetSize:
-        r = random.randint(0, len(genes) - 1)
-        if r not in pickedIndices:
-            pickedIndices.append(r)
+    return fitness, weightSUm
 
-    #print("sub is ", pickedIndices, " len is ", subsetSize)
-    return pickedIndices
-
-def sortSubsetsByFitness(genes, minVal):
-    maxFit = 0
-    maxIndex = 0
-    pickedGene = []
-    df = pd.read_csv('snacks.csv')
-
-    #while maxFit == 0:
-    pickedIndices = generateSubset(genes)
-
-    for i in range (0, len(pickedIndices)):
-        fitness = fitnessCalculator(genes[pickedIndices[i]], df, minVal)
-        #print("it is", len(pickedIndices))
-        if fitness > maxFit:
-            maxFit = fitness
-            maxIndex = pickedIndices[i]
-            pickedGene = genes[maxIndex]
-
-    print("fitness is ", maxFit)
-    # print("picked gene is ", gene)
-    return pickedGene
-
-def tournamentSelection(genes, minVal):
-    parents = []
-    while True:
-        mom = sortSubsetsByFitness(genes, minVal)
-        dad = sortSubsetsByFitness(genes, minVal)
-        if mom == dad:
-            continue
-        else:
-            break
-
-    # print("mom is ", mom)
-    # print("dad is ", dad)
-    parents.append(mom)
-    parents.append(dad)
-    return parents
+def sortGenes(genes, df, minVal, maxWeight, minNumber, maxNumber):
+    geneFitnessPair = [(gene, fitnessCalculator(gene, df, minVal, maxWeight, minNumber, maxNumber)) for gene in genes]
+    sortedPairs = sorted(geneFitnessPair, key=lambda x: x[1], reverse=True)
+    sortedGenes = [gene[0] for gene in sortedPairs]
+    return sortedGenes
 
 def crossover(mom, dad, crossPoint):
     if crossPoint < 0 or crossPoint >= min(len(mom), len(dad)):
@@ -119,9 +55,96 @@ def crossover(mom, dad, crossPoint):
     crossed_chromosome = mom[:crossPoint] + dad[crossPoint:]
     return crossed_chromosome
 
+def generateCrossoverProbabilities(genesLength):
+    crossProbs = []
+    for i in range (0, genesLength):
+        randomProb = random.random()
+        crossProbs.append(randomProb)
+
+    return crossProbs
+
+def extractEliteChromosomes(genes):
+    mid = len(genes) // 2
+    larger_half = genes[:mid]
+    pickedIndices = []
+
+    eliteNum = random.randint(0, mid)
+    for i in range (0, eliteNum):
+        pickedIndices.append(random.randint(0, len(larger_half) - 1))
+
+    #not an English newbbie, just a bunny
+    newjeans = []
+    for i in range(0, len(pickedIndices)):
+        newjeans.append(larger_half[pickedIndices[i]])
+
+    return newjeans
+
+def applyCrossOver(genes):
+    crossOverProbability = random.random()
+    crossoverProbs = generateCrossoverProbabilities(len(genes))
+    crossPicked = []
+
+    for i in range(0, len(genes)):
+        if crossoverProbs[i] < crossOverProbability:
+            crossPicked.append(i)
+
+    for i in range(0, len(crossPicked) - 1):
+        ch1 = genes[crossPicked[i]]
+        ch2 = genes[crossPicked[len(crossPicked) - 1 - i]]
+        ch1, ch2 = performCrossOver(ch1, ch2)
+        genes[crossPicked[i]] = ch1
+        genes[crossPicked[i+1]] = ch2
+
+    return genes
+
+def performCrossOver(mom, dad):
+    crossoverPoints = sorted(random.sample(range(0, len(mom)), 2))
+    child1 = mom[:crossoverPoints[0]] + dad[crossoverPoints[0]:crossoverPoints[1]] + mom[crossoverPoints[1]:]
+    child2 = dad[:crossoverPoints[0]] + mom[crossoverPoints[0]:crossoverPoints[1]] + dad[crossoverPoints[1]:]
+
+    return child1, child2
+
+def applyMutation(genes):
+    mutationProbability = random.random()
+    for i in range(len(genes)):
+        for j in range(len(genes[i]) - 1): 
+            if random.random() < mutationProbability:
+                temp = genes[i][j]
+                genes[i][j] = genes[i][j+1]
+                genes[i][j+1] = temp
+
+    print(genes)
+    return genes
+
+def generateChromosome(minNumber, maxNumber, df):
+    gene = []
+    pickedIndices = []
+    for n in range(minNumber, maxNumber+1):
+            for i in range(0, n):
+                randIndex = random.randint(0, df.shape[0]-1)
+                while pickedIndices.count(randIndex) == 1:
+                    randIndex = random.randint(0, df.shape[0]-1)
+                pickedIndices.append(randIndex)
+
+            gene = generateSnackWeights(pickedIndices, df)
+            pickedIndices.clear()
+
+    return gene
+
+def generatePrimaryPopulation(minNumber, maxNumber, df, minVal, maxWeight):
+    generationRound = random.randint(100, 500)
+    print("generationRounds are ", generationRound)
+    for i in range (0, generationRound):
+        gene = generateChromosome(minNumber, maxNumber, df)
+        newFitness, weightSum = fitnessCalculator(gene, df, minVal, maxWeight, minNumber, maxNumber)
+
+        if newFitness > 0:
+            genes.append(gene)
+        
+    return genes
+
 
 df = pd.read_csv('snacks.csv')
-#print(df)
 
 allPopulationNumber = df.shape[0]
 minVal = input()
@@ -134,62 +157,28 @@ maxWeight = int(maxWeight)
 minNumber = int(minNumber)
 maxNumber = int(maxNumber)
 
-chromosome = 0
 gene = []
 genes = []
-fitnessSofar = 0
 algorithmRound = 0
-maxRound = 5
-pickedIndices = []
-selectedParants = []
-
-lowerBoundWeight = 0
-upperBoundWeight = maxWeight
-
-for n in range(minNumber, maxNumber+1):
-    algorithmRound = 0
-    pickedWeight = []
-
-    gene = initializePopulation(df.shape[0])
+maxRound = 50
+elite = []
+algorithmRound = 0
+restartNum = random.randint(1,10)
+restartNum = 1
+while True:
+    genes = generatePrimaryPopulation(minNumber, maxNumber, df, minVal, maxWeight)
     while algorithmRound < maxRound:
-        for i in range(0, n):
-
-            randIndex = random.randint(0, df.shape[0]-1)
-            while pickedIndices.count(randIndex) == 1:
-                randIndex = random.randint(0, df.shape[0]-1)
-            pickedIndices.append(randIndex)
-
-        gene = generateSnackWeights(pickedIndices, maxWeight, df)
-        #print("the whole weight is ", addWeights(gene))
-
-        newFitness = fitnessCalculator(gene, df, minVal)
-        if newFitness == 0:
-            continue
-
-        genes.append(gene)
-        if newFitness > fitnessSofar:
-            fitnessSofar = newFitness
-
-        #print("so far fitness is", fitnessSofar)
-
-        pickedIndices.clear()
-        gene = initializePopulation(df.shape[0])
+        sortedGenes = sortGenes(genes, df, minVal, maxWeight, minNumber, maxNumber)
+        elite = extractEliteChromosomes(sortedGenes)
+        genes = applyCrossOver(elite)
+        genes = applyMutation(genes)
         algorithmRound = algorithmRound + 1
 
-#print(genes)
-#select
-parents = random.randint(round(len(genes) / 4), round(len(genes) / 2))
-for i in range(0, parents):
-    selectedParants.append(tournamentSelection(genes, minVal))
+    if len(genes) == 0:
+        continue
+    else:
+        break
 
-print(selectedParants)
-
-#crossover
-genes2 = []
-for i in range(0, len(selectedParants)):
-    newGene = crossover(selectedParants[i][0], selectedParants[i][1], random.randint(1, df.shape[0]))
-    genes2.append(newGene)
-
-#print(genes2)
-#mutation
-#continuou with the new population
+sortedGenes = sortGenes(genes, df, minVal, maxWeight, minNumber, maxNumber)
+for i in range(len(sortedGenes)):
+    print(fitnessCalculator(sortedGenes[i], df, minVal, maxWeight, minNumber, maxNumber))
