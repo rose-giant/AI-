@@ -4,6 +4,7 @@ import pandas as pd
 AVAILABLE_WEIGHT_COLUMN = 'Available Weight'
 VALUE_COLUMN = 'Value'
 SNACK_COLUMN = 'Snack'
+FILE_NAME = 'snacks.csv'
 
 def initializePopulation(dfSize):
     population = []
@@ -35,18 +36,6 @@ def fitnessCalculator(gene, df, minVal, maxWeight, minNumber, maxNumber) -> tupl
     types = 0
     fitness = 0
     weightSUm = 0
-
-    # weightSUm = addWeights(gene)
-    # for i in range(0, len(gene)):
-    #     if gene[i] != 0:
-    #         weightSUm += gene[i]
-    #         types += 1
-    #         value += df['value_per_weight'][i] * gene[i]
-
-    # for i in range(0, len(gene)):
-    #     if (gene[i] != 0):
-    #         fitness = (df[AVAILABLE_WEIGHT_COLUMN][i] / gene[i]) * (maxWeight / weightSUm) * (value - minVal)
-
     for i in range(0, len(gene)):
         if gene[i] > df[AVAILABLE_WEIGHT_COLUMN][i]:
             return 0, 0
@@ -160,7 +149,7 @@ def generatePrimaryPopulation(minNumber, maxNumber, df, minVal, maxWeight):
     return genes
 
 
-df = pd.read_csv('snacks.csv')
+df = pd.read_csv(FILE_NAME)
 minVal = input()
 maxWeight= input()
 minNumber= input()
