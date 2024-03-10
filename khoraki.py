@@ -3,6 +3,7 @@ import pandas as pd
 
 AVAILABLE_WEIGHT_COLUMN = 'Available Weight'
 VALUE_COLUMN = 'Value'
+SNACK_COLUMN = 'Snack'
 
 def initializePopulation(dfSize):
     population = []
@@ -22,12 +23,34 @@ def generateSnackWeights(pickedIndices, df):
 
     return gene
 
+def addWeights(gene):
+    weightSUm = 0
+    for i in range(0, len(gene)): 
+        weightSUm += gene[i]
+    return weightSUm
+
 def fitnessCalculator(gene, df, minVal, maxWeight, minNumber, maxNumber) -> tuple[int, int]:
     df['value_per_weight'] = df[VALUE_COLUMN] / df[AVAILABLE_WEIGHT_COLUMN]
     value = 0
     types = 0
-    weightSUm = 0
     fitness = 0
+    weightSUm = 0
+
+    # weightSUm = addWeights(gene)
+    # for i in range(0, len(gene)):
+    #     if gene[i] != 0:
+    #         weightSUm += gene[i]
+    #         types += 1
+    #         value += df['value_per_weight'][i] * gene[i]
+
+    # for i in range(0, len(gene)):
+    #     if (gene[i] != 0):
+    #         fitness = (df[AVAILABLE_WEIGHT_COLUMN][i] / gene[i]) * (maxWeight / weightSUm) * (value - minVal)
+
+    for i in range(0, len(gene)):
+        if gene[i] > df[AVAILABLE_WEIGHT_COLUMN][i]:
+            return 0, 0
+
     for i in range(0, len(gene)):
         if gene[i] != 0:
             weightSUm += gene[i]
@@ -101,13 +124,15 @@ def performCrossOver(mom, dad):
     return child1, child2
 
 def applyMutation(genes):
-    mutationProbability = random.random()
-    for i in range(len(genes)):
-        for j in range(len(genes[i]) - 1): 
-            if random.random() < mutationProbability:
-                temp = genes[i][j]
-                genes[i][j] = genes[i][j+1]
-                genes[i][j+1] = temp
+    mutationRound = random.randint(1, 10)
+    for j in range(0, mutationRound):
+        mutationProbability = random.random()
+        for i in range(len(genes)):
+            for j in range(len(genes[i]) - 1): 
+                if random.random() < mutationProbability:
+                    temp = genes[i][j]
+                    genes[i][j] = genes[i][j+1]
+                    genes[i][j+1] = temp
 
     return genes
 
@@ -149,15 +174,15 @@ maxNumber = int(maxNumber)
 gene = []
 genes = []
 algorithmRound = 0
-maxRound = 50
+maxRound = 25
 elite = []
 answers = []
-restartNum = random.randint(1,10)
+restartNum = random.randint(10,100)
+print("restart: ", restartNum)
 restartCount = 0
 while True:
     while restartCount < restartNum:
         genes = generatePrimaryPopulation(minNumber, maxNumber, df, minVal, maxWeight)
-
         while algorithmRound < maxRound:
             sortedGenes = sortGenes(genes, df, minVal, maxWeight, minNumber, maxNumber)
             elite = extractEliteChromosomes(sortedGenes)
@@ -168,6 +193,7 @@ while True:
             sortedGenes = sortGenes(genes, df, minVal, maxWeight, minNumber, maxNumber)
             answers.append(sortedGenes[0])
             algorithmRound += 1
+
             i = 0
             while i < len(answers):
                 a, _ = fitnessCalculator(answers[i], df, minVal, maxWeight, minNumber, maxNumber)
@@ -176,9 +202,12 @@ while True:
                 else:
                     i += 1
 
+        print("restart count: ", restartCount)
         restartCount += 1
-       
+        algorithmRound = 0
+
     if (len(answers) == 0):
+        print("continue")
         restartCount -= 1
         continue
     else:
@@ -187,3 +216,5 @@ while True:
 sortedAnswers = sortGenes(answers, df, minVal, maxWeight, minNumber, maxNumber)
 print(fitnessCalculator(sortedAnswers[0], df, minVal, maxWeight, minNumber, maxNumber))
 print("\n", answers[0])
+for i in range(0, df.shape[0]):
+    print("snack name is: ", df[SNACK_COLUMN][i]," and available: " ,df[AVAILABLE_WEIGHT_COLUMN][i], " gene is: ", answers[0][i])
