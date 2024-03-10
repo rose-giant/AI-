@@ -1,6 +1,9 @@
 import random
 import pandas as pd
 
+AVAILABLE_WEIGHT_COLUMN = 'Available Weight'
+VALUE_COLUMN = 'Value'
+
 def initializePopulation(dfSize):
     population = []
     for i in range (0, dfSize):
@@ -14,13 +17,13 @@ def generateRandomWeight(minWeight, maxWeight):
 def generateSnackWeights(pickedIndices, df):
     gene = initializePopulation(df.shape[0])
     for i in range(0, len(pickedIndices)):
-        w = generateRandomWeight(0, df['Available Weight'][pickedIndices[i]])
+        w = generateRandomWeight(0, df[AVAILABLE_WEIGHT_COLUMN][pickedIndices[i]])
         gene[pickedIndices[i]] = w
 
     return gene
 
 def fitnessCalculator(gene, df, minVal, maxWeight, minNumber, maxNumber) -> tuple[int, int]:
-    df['value_per_weight'] = df['Value'] / df['Available Weight']
+    df['value_per_weight'] = df[VALUE_COLUMN] / df[AVAILABLE_WEIGHT_COLUMN]
     value = 0
     types = 0
     weightSUm = 0
@@ -48,13 +51,6 @@ def sortGenes(genes, df, minVal, maxWeight, minNumber, maxNumber):
     sortedGenes = [gene[0] for gene in sortedPairs]
     return sortedGenes
 
-def crossover(mom, dad, crossPoint):
-    if crossPoint < 0 or crossPoint >= min(len(mom), len(dad)):
-        raise ValueError("Cross point is out of range")
-
-    crossed_chromosome = mom[:crossPoint] + dad[crossPoint:]
-    return crossed_chromosome
-
 def generateCrossoverProbabilities(genesLength):
     crossProbs = []
     for i in range (0, genesLength):
@@ -64,7 +60,7 @@ def generateCrossoverProbabilities(genesLength):
     return crossProbs
 
 def extractEliteChromosomes(genes):
-    mid = len(genes) // 2
+    mid = len(genes) // 2 + len(genes) // 4 + len(genes) // 8
     larger_half = genes[:mid]
     pickedIndices = []
 
@@ -113,7 +109,6 @@ def applyMutation(genes):
                 genes[i][j] = genes[i][j+1]
                 genes[i][j+1] = temp
 
-    print(genes)
     return genes
 
 def generateChromosome(minNumber, maxNumber, df):
@@ -133,20 +128,14 @@ def generateChromosome(minNumber, maxNumber, df):
 
 def generatePrimaryPopulation(minNumber, maxNumber, df, minVal, maxWeight):
     generationRound = random.randint(100, 500)
-    print("generationRounds are ", generationRound)
     for i in range (0, generationRound):
         gene = generateChromosome(minNumber, maxNumber, df)
-        newFitness, weightSum = fitnessCalculator(gene, df, minVal, maxWeight, minNumber, maxNumber)
-
-        if newFitness > 0:
-            genes.append(gene)
+        genes.append(gene)
         
     return genes
 
 
 df = pd.read_csv('snacks.csv')
-
-allPopulationNumber = df.shape[0]
 minVal = input()
 maxWeight= input()
 minNumber= input()
@@ -162,23 +151,39 @@ genes = []
 algorithmRound = 0
 maxRound = 50
 elite = []
-algorithmRound = 0
+answers = []
 restartNum = random.randint(1,10)
-restartNum = 1
+restartCount = 0
 while True:
-    genes = generatePrimaryPopulation(minNumber, maxNumber, df, minVal, maxWeight)
-    while algorithmRound < maxRound:
-        sortedGenes = sortGenes(genes, df, minVal, maxWeight, minNumber, maxNumber)
-        elite = extractEliteChromosomes(sortedGenes)
-        genes = applyCrossOver(elite)
-        genes = applyMutation(genes)
-        algorithmRound = algorithmRound + 1
+    while restartCount < restartNum:
+        genes = generatePrimaryPopulation(minNumber, maxNumber, df, minVal, maxWeight)
 
-    if len(genes) == 0:
+        while algorithmRound < maxRound:
+            sortedGenes = sortGenes(genes, df, minVal, maxWeight, minNumber, maxNumber)
+            elite = extractEliteChromosomes(sortedGenes)
+            genes = applyCrossOver(elite)
+            genes = applyMutation(genes)
+            if (len(genes) == 0):
+                break
+            sortedGenes = sortGenes(genes, df, minVal, maxWeight, minNumber, maxNumber)
+            answers.append(sortedGenes[0])
+            algorithmRound += 1
+            i = 0
+            while i < len(answers):
+                a, _ = fitnessCalculator(answers[i], df, minVal, maxWeight, minNumber, maxNumber)
+                if a == 0:
+                    answers.pop(i)
+                else:
+                    i += 1
+
+        restartCount += 1
+       
+    if (len(answers) == 0):
+        restartCount -= 1
         continue
     else:
         break
 
-sortedGenes = sortGenes(genes, df, minVal, maxWeight, minNumber, maxNumber)
-for i in range(len(sortedGenes)):
-    print(fitnessCalculator(sortedGenes[i], df, minVal, maxWeight, minNumber, maxNumber))
+sortedAnswers = sortGenes(answers, df, minVal, maxWeight, minNumber, maxNumber)
+print(fitnessCalculator(sortedAnswers[0], df, minVal, maxWeight, minNumber, maxNumber))
+print("\n", answers[0])
